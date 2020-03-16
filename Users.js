@@ -1,7 +1,8 @@
 var mongoose = require('mongoose');
 var Schema = mongoose.Schema;
 var bcrypt = require('bcrypt-nodejs');
-
+//copy everything but change for movies
+//REACT_APP_API_URL link for heroku app
 mongoose.Promise = global.Promise;
 
 mongoose.connect(process.env.DB, { useNewUrlParser: true } );

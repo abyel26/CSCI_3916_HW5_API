@@ -4,15 +4,31 @@ var passport = require('passport');
 var authJwtController = require('./auth_jwt');
 var User = require('./Users');
 var jwt = require('jsonwebtoken');
-
+var cors = require("cors");
 var app = express();
 module.exports = app; // for testing
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
-
+app.use(cors());
 app.use(passport.initialize());
 
 var router = express.Router();
+
+function getJSONObject(req) {
+    var json = {
+        headers: "No Headers",
+        key: process.env.UNIQUE_KEY,
+        body: "No Body"
+    };
+
+    if (req.body != null) {
+        json.body = req.body;
+    }
+    if (req.headers != null) {
+        json.headers = req.headers;
+    }
+    return json;
+}
 
 router.route('/postjwt')
     .post(authJwtController.isAuthenticated, function (req, res) {
@@ -81,7 +97,7 @@ router.post('/signin', function(req, res) {
         if (err) res.send(err);
 
         user.comparePassword(userNew.password, function(isMatch){
-            if (isMatch) {
+            if (isMatch) {//Easy to find user with JWT token
                 var userToken = {id: user._id, username: user.username};
                 var token = jwt.sign(userToken, process.env.SECRET_KEY);
                 res.json({success: true, token: 'JWT ' + token});
