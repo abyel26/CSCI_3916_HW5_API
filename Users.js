@@ -31,7 +31,6 @@ UserSchema.pre('save', function(next) {
         next();
     });
 });
-
 UserSchema.methods.comparePassword = function(password, callback) {
     var user = this;
 
@@ -41,4 +40,4 @@ UserSchema.methods.comparePassword = function(password, callback) {
 };
 
 // return the model
-module.exports = mongoose.model('User', UserSchema);
+module.exports = mongoose.model('Users', UserSchema);

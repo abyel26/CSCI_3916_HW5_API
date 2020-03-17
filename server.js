@@ -3,6 +3,7 @@ var bodyParser = require('body-parser');
 var passport = require('passport');
 var authJwtController = require('./auth_jwt');
 var User = require('./Users');
+var Movie = require('./Movie');
 var jwt = require('jsonwebtoken');
 var cors = require("cors");
 var app = express();
@@ -17,7 +18,7 @@ var router = express.Router();
 function getJSONObject(req) {
     var json = {
         headers: "No Headers",
-        key: process.env.UNIQUE_KEY,
+        key: process.env.SECRET_KEY,
         body: "No Body"
     };
 
@@ -29,6 +30,60 @@ function getJSONObject(req) {
     }
     return json;
 }
+
+router.use('/movies', passport.authenticate('jwt', { //CRUD operations with jwt authentication.
+    session: false
+}), (req, res) => {
+
+    var newMovie = new Movie();
+    newMovie.title = req.body.title;
+    newMovie.yearReleased = req.body.yearReleased;
+    newMovie.genre = req.body.genre;
+    newMovie.actors = req.body.actors;
+
+    if (!newMovie.title || !newMovie.yearReleased || !newMovie.genre || !newMovie.actors){//Check request body.
+        res.json({success: false, message: 'Please pass title, released year, genre, and a two-dimensional array of 3 actors with actor name, and character name.'});
+    }
+
+    else { //Go to http methods.
+
+        if(newMovie.actors.length != 3){ //Check actors array size.
+            res.json({success: false, message: 'Need to pass a two-dimensional array of 3 actors. ' +
+                    'Each element needs an actor name, and a character name.' });
+        }
+        else {
+            if (req.method == 'GET') { //Read
+
+                res.status(200).send({
+                    message: "GET Movies",
+                    headers: req.headers,
+                    query: req.query,
+                    env: process.env.SECRET_KEY
+                });
+            } else if (req.method == 'POST') { //Create
+
+                res.status(200).send({
+                    message: "Movie Saved",
+                    headers: req.headers,
+                    query: req.query,
+                    env: process.env.SECRET_KEY
+                });
+
+            } else if (req.method == 'DELETE') { //Delete
+
+                res.status(200).send({message:"Movie Deleted", headers: req.headers, query: req.query, env: process.env.SECRET_KEY});
+
+            } else if (req.method == 'PUT') { //Update
+                res.status(200).send({ message:"Movie Updated", headers: req.headers, query: req.query, env: process.env.SECRET_KEY});
+
+            } else {
+                res.send("HTTP request not supported.");
+                res.end();
+            }
+        }
+
+    }
+});
 
 router.route('/postjwt')
     .post(authJwtController.isAuthenticated, function (req, res) {
@@ -93,22 +148,34 @@ router.post('/signin', function(req, res) {
     userNew.username = req.body.username;
     userNew.password = req.body.password;
 
-    User.findOne({ username: userNew.username }).select('name username password').exec(function(err, user) {
-        if (err) res.send(err);
+    if ( !userNew.name || !userNew.username || !userNew.password){
+        res.json({success: false, msg: 'Please pass name, username, and password.'});
+    }
+    else{
 
-        user.comparePassword(userNew.password, function(isMatch){
-            if (isMatch) {//Easy to find user with JWT token
-                var userToken = {id: user._id, username: user.username};
-                var token = jwt.sign(userToken, process.env.SECRET_KEY);
-                res.json({success: true, token: 'JWT ' + token});
-            }
-            else {
-                res.status(401).send({success: false, message: 'Authentication failed.'});
-            }
+        User.findOne({ username: userNew.username }).select('name username password').exec(function(err, user) {
+            if (err) res.send(err);
+
+            user.comparePassword(userNew.password, function(isMatch){
+                if (isMatch) {//Easy to find user with JWT token
+                    var userToken = {id: user._id, username: user.username};
+                    var token = jwt.sign(userToken, process.env.SECRET_KEY);
+                    res.json({success: true, token: 'JWT ' + token});
+                }
+                else {
+                    res.status(401).send({success: false, message: 'Authentication failed.'});
+                }
+            });
+
+
         });
+    }
 
+});
 
-    });
+router.use('/*', function (req, res) {
+    //No base URL requests allowed.
+    res.status(401).send({message:"No base URL requests allowed", headers: req.headers, query: req.query});
 });
 
 app.use('/', router);
