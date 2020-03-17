@@ -119,8 +119,8 @@ router.route('/users')
     });
 
 router.post('/signup', function(req, res) {
-    if (!req.body.username || !req.body.password) {
-        res.json({success: false, message: 'Please pass username and password.'});
+    if (!req.body.name || !req.body.username || !req.body.password) {
+        res.json({success: false, message: 'Please pass name, username, and password.'});
     }
     else {
         var user = new User();
@@ -147,12 +147,12 @@ router.post('/signin', function(req, res) {
     userNew.username = req.body.username;
     userNew.password = req.body.password;
 
-    if ( !userNew.name || !userNew.username || !userNew.password){
-        res.json({success: false, msg: 'Please pass name, username, and password.'});
+    if (!userNew.username || !userNew.password){
+        res.json({success: false, msg: 'Please pass username, and password.'});
     }
     else{
 
-        User.findOne({ username: userNew.username }).select('name username password').exec(function(err, user) {
+        User.findOne({ username: userNew.username }).select('namername password').exec(function(err, user) {
             if (err) res.send(err);
 
             user.comparePassword(userNew.password, function(isMatch){
