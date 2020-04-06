@@ -1,5 +1,3 @@
-
-
 var mongoose = require('mongoose');
 var Schema = mongoose.Schema;
 mongoose.Promise = global.Promise;
@@ -13,6 +11,14 @@ var MovieSchema = new Schema({
     yearReleased: String,
     genre: String,
     actors: [[String, String], [String, String], [String, String]],
+});
+
+// hash the password before the user is saved
+MovieSchema.pre('save', function(next) {
+    var movie = this;
+
+    //Check movie title
+    if (!movie.isModified('title')) return next();
 });
 
 // return the model

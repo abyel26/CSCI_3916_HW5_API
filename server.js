@@ -62,6 +62,18 @@ router.use('/movies', passport.authenticate('jwt', { //CRUD operations with jwt 
                 });
             } else if (req.method == 'POST') { //Create
 
+                // save the movie
+                newMovie.save(function(err) {
+                    if (err) {
+                        // duplicate entry
+                        if (err.code == 11000)
+                            return res.json({ success: false, message: 'This movie already exists. '});
+                        else
+                            return res.send(err);
+                    }
+
+                    res.json({ success: true});
+                });
                 res.status(200).send({
                     message: "Movie Saved",
                     headers: req.headers,
