@@ -98,7 +98,7 @@ router.use('/movies', passport.authenticate('jwt', { //CRUD operations with jwt 
 
                 var movieToDelete = Movie.find({title: newMovie.title}); //Check if movie exists in database
 
-                Movie.remove({title: movieToDelete}, function(err){
+                Movie.remove({title: movieToDelete.title}, function(err){
                     if (err){
                         res.send({status:false, message:"Unable to delete movie."});
                     }
