@@ -15,10 +15,7 @@ var MovieSchema = new Schema({
 
 // hash the password before the user is saved
 MovieSchema.pre('save', function(next) {
-    var movie = this;
-
-    //Check movie title
-    if (!movie.isModified('title')) return next();
+    return next();
 });
 
 // return the model

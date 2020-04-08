@@ -54,40 +54,74 @@ router.use('/movies', passport.authenticate('jwt', { //CRUD operations with jwt 
         else {
             if (req.method == 'GET') { //Read
 
-                res.status(200).send({
-                    message: "GET Movies",
-                    headers: req.headers,
-                    query: req.query,
-                    env: process.env.SECRET_KEY
+                Movie.find({}, function(err, movies) {
+                    var moviesMap = {};
+
+                    if (!err){
+                        movies.forEach(function(movie) {//Iterate through movies and send back json array
+                            moviesMap[movie._id] = movie;
+                        });
+                        res.status(200).send({
+                            message: "GET Movies",
+                            headers: req.headers,
+                            query: req.query,
+                            env: process.env.SECRET_KEY,
+                            movies: moviesMap
+                        });
+                    }
+                    else{
+                        return res.json({ success: false, message: 'Could not GET'});
+                    }
                 });
+
             } else if (req.method == 'POST') { //Create
 
                 // save the movie
                 newMovie.save(function(err) {
                     if (err) {
-                        // duplicate entry
-                        if (err.code == 11000)
-                            return res.json({ success: false, message: 'This movie already exists. '});
-                        else
-                            return res.send(err);
+                        return res.json({ success: false, message: 'Could not save movie.'});
                     }
 
-                    res.json({ success: true});
+                    else{
+                        res.status(200).send({
+                            success: true,
+                            message: "Movie Saved",
+                            headers: req.headers,
+                            query: req.query,
+                            env: process.env.SECRET_KEY
+                        });
+                    }
                 });
-                res.status(200).send({
-                    message: "Movie Saved",
-                    headers: req.headers,
-                    query: req.query,
-                    env: process.env.SECRET_KEY
-                });
+
 
             } else if (req.method == 'DELETE') { //Delete
 
-                res.status(200).send({message:"Movie Deleted", headers: req.headers, query: req.query, env: process.env.SECRET_KEY});
+                var movieToDelete = Movie.find({title: newMovie.title}); //Check if movie exists in database
+
+                Movie.remove({title: movieToDelete}, function(err){
+                    if (err){
+                        res.send({status:false, message:"Unable to delete movie."});
+                    }
+                    else{
+                        res.status(200).send({message:"Movie Deleted", headers: req.headers, query: req.query, env: process.env.SECRET_KEY});
+                    }
+                });
+
+
 
             } else if (req.method == 'PUT') { //Update
-                res.status(200).send({ message:"Movie Updated", headers: req.headers, query: req.query, env: process.env.SECRET_KEY});
+                newMovie.oldTitle = req.body.oldTitle;//For update, add an oldTitle to the request to find movie to update.
 
+                Movie.findOneAndUpdate({title: newMovie.oldTitle}, {$set:{title: newMovie.title, yearReleased: newMovie.yearReleased, genre: newMovie.genre, actors: newMovie.actors}}, (err,docs) =>{
+
+                    if (err){
+                        res.send({status:false, message:"Could not update movie."});
+                    }
+                    else{
+                        res.status(200).send({ message:"Movie Updated", headers: req.headers, query: req.query, env: process.env.SECRET_KEY});
+                    }
+
+                });
             } else {
                 res.send("HTTP request not supported.");
                 res.end();
