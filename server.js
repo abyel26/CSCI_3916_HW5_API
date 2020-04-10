@@ -122,8 +122,6 @@ router.use('/movies', passport.authenticate('jwt', { //CRUD operations with jwt 
         else {
             if (req.method == 'GET') { //Read
 
-
-
                 Movie.find({}, function(err, movies) {
                     var moviesMap = {};
 
@@ -159,7 +157,7 @@ router.use('/movies', passport.authenticate('jwt', { //CRUD operations with jwt 
 
 
                         }
-                        else if (sendReviews == "false"){ //If parameter is false, don't send reviews.
+                        else{ //If parameter is false, don't send reviews.
                             res.status(200).send({
                                 message: "GET Movies",
                                 headers: req.headers,
