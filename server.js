@@ -4,6 +4,7 @@ var passport = require('passport');
 var authJwtController = require('./auth_jwt');
 var User = require('./Users');
 var Movie = require('./Movie');
+var Reviews = require('./Reviews');
 var jwt = require('jsonwebtoken');
 var cors = require("cors");
 var app = express();
@@ -12,6 +13,15 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cors());
 app.use(passport.initialize());
+
+var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
+mongoose.Promise = global.Promise;
+mongoose.connect(process.env.DB, { useNewUrlParser: true } );
+mongoose.set('useCreateIndex', true);
+
+
+
 
 var router = express.Router();
 
@@ -31,6 +41,60 @@ function getJSONObject(req) {
     return json;
 }
 
+router.route('/reviews')
+    .post(authJwtController.isAuthenticated, function (req, res) {
+
+            var  newReview = new  Reviews();
+            newReview.movieReviewed = req.body.movieReviewed;
+            newReview.reviewerName = req.user.name;
+            newReview.quote = req.body.quote;
+            newReview.rating  = req.body.rating;
+
+
+        newReview.save(function(err) {
+            if (err) {
+                return res.json({ success: false, message: 'Could not save review.'});
+            }
+
+            else{
+                res.status(200).send({
+                    success: true,
+                    message: "Review Saved",
+                    headers: req.headers,
+                    query: req.query,
+                    env: process.env.SECRET_KEY
+                });
+            }
+        });
+
+        }
+    )
+
+    .get(function (req, res) {
+
+        Reviews.find({}, function(err, reviews) {
+            var reviewMap = {};
+
+            if (!err) {
+                reviews.forEach(function (review) {//Iterate through reviews and send back json array
+
+                    reviewMap[review._id] = review;
+                });
+                res.status(200).send({
+                    message: "GET Reviews",
+                    headers: req.headers,
+                    query: req.query,
+                    env: process.env.SECRET_KEY,
+                    reviews: reviewMap
+                });
+            } else {
+                return res.json({success: false, message: 'Could not GET'});
+            }
+
+        })
+
+    });
+
 router.use('/movies', passport.authenticate('jwt', { //CRUD operations with jwt authentication.
     session: false
 }), (req, res) => {
@@ -40,6 +104,10 @@ router.use('/movies', passport.authenticate('jwt', { //CRUD operations with jwt 
     newMovie.yearReleased = req.body.yearReleased;
     newMovie.genre = req.body.genre;
     newMovie.actors = req.body.actors;
+
+    var newReview = new Reviews();
+    newReview.movieReviewed = req.body.title;
+
 
     if (!newMovie.title || !newMovie.yearReleased || !newMovie.genre || !newMovie.actors){//Check request body.
         res.json({success: false, message: 'Please pass title, released year, genre, and a two-dimensional array of 3 actors with actor name, and character name.'});
@@ -54,20 +122,52 @@ router.use('/movies', passport.authenticate('jwt', { //CRUD operations with jwt 
         else {
             if (req.method == 'GET') { //Read
 
+
+
                 Movie.find({}, function(err, movies) {
                     var moviesMap = {};
 
                     if (!err){
                         movies.forEach(function(movie) {//Iterate through movies and send back json array
+
                             moviesMap[movie._id] = movie;
                         });
-                        res.status(200).send({
-                            message: "GET Movies",
-                            headers: req.headers,
-                            query: req.query,
-                            env: process.env.SECRET_KEY,
-                            movies: moviesMap
-                        });
+
+                        var sendReviews = req.query.reviews; //check parameter for reviews
+
+                        if(sendReviews == "true"){//If parameter is true, send movie info with reviews
+                            mongoose.model('movies').aggregate([
+                                {
+                                    $lookup: {
+
+                                        from: "reviews",
+                                        localField: "title",
+                                        foreignField: "movieReviewed",
+                                        as: "review"
+                                    }
+                                }
+                            ]).
+                            then(function (res2) {
+                                res.status(200).send({
+                                    message: "GET Movies",
+                                    headers: req.headers,
+                                    query: req.query,
+                                    env: process.env.SECRET_KEY,
+                                    "movies with review": res2
+                                });
+                            });
+
+
+                        }
+                        else if (sendReviews == "false"){ //If parameter is false, don't send reviews.
+                            res.status(200).send({
+                                message: "GET Movies",
+                                headers: req.headers,
+                                query: req.query,
+                                env: process.env.SECRET_KEY,
+                                movies: moviesMap
+                            });
+                        }
                     }
                     else{
                         return res.json({ success: false, message: 'Could not GET'});
