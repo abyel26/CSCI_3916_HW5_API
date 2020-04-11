@@ -50,23 +50,32 @@ router.route('/reviews')
             newReview.quote = req.body.quote;
             newReview.rating  = req.body.rating;
 
+            var movieExists = false;
+                Movie.findOne({title: newReview.movieReviewed},function (err, exists) {
+                    if (err) {
+                        return res.json({ success: false, message: 'Could not save review.'});
+                    }
+                    if (!exists) {
+                        return res.json({ success: false, message: 'Movie does not exist in database.'});
+                    }
+                    else{//If movie exists, save
+                        newReview.save(function(err) {
+                            if (err) {
+                                return res.json({ success: false, message: 'Could not save review.'});
+                            }
 
-        newReview.save(function(err) {
-            if (err) {
-                return res.json({ success: false, message: 'Could not save review.'});
-            }
-
-            else{
-                res.status(200).send({
-                    success: true,
-                    message: "Review Saved",
-                    headers: req.headers,
-                    query: req.query,
-                    env: process.env.SECRET_KEY
+                            else{
+                                res.status(200).send({
+                                    success: true,
+                                    message: "Review Saved",
+                                    headers: req.headers,
+                                    query: req.query,
+                                    env: process.env.SECRET_KEY
+                                });
+                            }
+                        });
+                    }
                 });
-            }
-        });
-
         }
     )
 
