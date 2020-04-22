@@ -11,6 +11,7 @@ var MovieSchema = new Schema({
     yearReleased: String,
     genre: String,
     actors: [[String, String], [String, String], [String, String]],
+    imageUrl: String
 });
 
 // hash the password before the user is saved

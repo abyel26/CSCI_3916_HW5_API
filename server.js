@@ -13,7 +13,6 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cors());
 app.use(passport.initialize());
-
 var mongoose = require('mongoose');
 var Schema = mongoose.Schema;
 mongoose.Promise = global.Promise;
@@ -113,126 +112,184 @@ router.use('/movies', passport.authenticate('jwt', { //CRUD operations with jwt 
     newMovie.yearReleased = req.body.yearReleased;
     newMovie.genre = req.body.genre;
     newMovie.actors = req.body.actors;
+    newMovie.imageUrl = req.body.imageUrl;
 
     var newReview = new Reviews();
     newReview.movieReviewed = req.body.title;
 
 
-    if (!newMovie.title || !newMovie.yearReleased || !newMovie.genre || !newMovie.actors){//Check request body.
-        res.json({success: false, message: 'Please pass title, released year, genre, and a two-dimensional array of 3 actors with actor name, and character name.'});
+    if (req.method == 'GET') { //Read
+
+        var url = req._parsedUrl.pathname;
+       var id = url.substring(url.lastIndexOf('/') + 1);
+       if(id.localeCompare("") == 0){
+       }
+        if(id.localeCompare("movies") == 0){
+        }
+
+       if(!((id.localeCompare("") == 0) || (id.localeCompare("movies") == 0))) { //If passed movie id, return get movie of that specific id
+           Movie.findOne({_id: id}, {}, (err, docs) => {
+
+               if (err) {
+                   res.send({status: false, message: "Could not GET movie."});
+               } else {
+
+                   res.status(200).send({movie: docs._doc});
+               }
+
+           })
+       }
+       else { //No movie id passed, return all movies
+
+           Movie.find({}, function (err, movies) {
+               var moviesMap = {};
+
+               if (!err) {
+                   movies.forEach(function (movie) {//Iterate through movies and send back json array
+                       moviesMap[movie._id] = movie;
+                   });
+                   var sendReviews = req.query.reviews; //check parameter for reviews
+
+                   if (sendReviews == "true") {//If parameter is true, send movie info with reviews
+                       mongoose.model('movies').aggregate([
+                           {$lookup: {
+
+                                   from: "reviews",
+                                   localField: "title",
+                                   foreignField: "movieReviewed",
+                                   as: "review"
+                               }
+                           }
+                       ]).then(function (res2) {
+
+                           function sortByAvgRating(){//Used to sort descending the movies by avg rating
+                               return function(a,b){
+                                   if(a["avgRating"] > b["avgRating"])
+                                       return -1;
+                                   else if(a["avgRating"] < b["avgRating"])
+                                       return 1;
+
+                                   return 0;
+                               }
+                           }
+
+                           var averageRating = 0;
+                           var n = 0;
+
+                           for (let i = 0; i < Object.keys(res2).length; i++) { //Compute average rating of reviews
+                               for (let k = 0; k < Object.keys(res2[i]["review"]).length; k++) {
+                                   averageRating = +averageRating + +res2[i]["review"][k]["rating"];
+                                   n++;
+                               }
+                               averageRating = averageRating/n;
+                               res2[i]["avgRating"] = averageRating;
+                               averageRating = 0;
+                               n = 0;
+                           }
+
+                           res2.sort(sortByAvgRating());
+
+                           res.status(200).send({
+                               message: "GET Movies",
+                               headers: req.headers,
+                               query: req.query,
+                               env: process.env.SECRET_KEY,
+                               "movies": res2
+                           });
+                       });
+
+
+                   }//if
+                   else { //If parameter is false, don't send reviews.
+                       res.status(200).send({
+                           message: "GET Movies",
+                           headers: req.headers,
+                           query: req.query,
+                           env: process.env.SECRET_KEY,
+                           movies: moviesMap
+                       });
+                   }
+               } else {
+                   return res.json({success: false, message: 'Could not GET'});
+               }
+           });
+       }
     }
 
-    else { //Go to http methods.
+    else { //Go to other http methods.
 
-        if(newMovie.actors.length != 3){ //Check actors array size.
-            res.json({success: false, message: 'Need to pass a two-dimensional array of 3 actors. ' +
-                    'Each element needs an actor name, and a character name.' });
+        if (!newMovie.title || !newMovie.yearReleased || !newMovie.genre || !newMovie.actors){//Check request body.
+            res.json({success: false, message: 'Please pass title, released year, genre, and a two-dimensional array of 3 actors with actor name, and character name.'});
         }
         else {
-            if (req.method == 'GET') { //Read
-
-                Movie.find({}, function(err, movies) {
-                    var moviesMap = {};
-
-                    if (!err){
-                        movies.forEach(function(movie) {//Iterate through movies and send back json array
-
-                            moviesMap[movie._id] = movie;
-                        });
-
-                        var sendReviews = req.query.reviews; //check parameter for reviews
-
-                        if(sendReviews == "true"){//If parameter is true, send movie info with reviews
-                            mongoose.model('movies').aggregate([
-                                {
-                                    $lookup: {
-
-                                        from: "reviews",
-                                        localField: "title",
-                                        foreignField: "movieReviewed",
-                                        as: "review"
-                                    }
-                                }
-                            ]).
-                            then(function (res2) {
-                                res.status(200).send({
-                                    message: "GET Movies",
-                                    headers: req.headers,
-                                    query: req.query,
-                                    env: process.env.SECRET_KEY,
-                                    "movies with review": res2
-                                });
-                            });
-
-
-                        }
-                        else{ //If parameter is false, don't send reviews.
-                            res.status(200).send({
-                                message: "GET Movies",
-                                headers: req.headers,
-                                query: req.query,
-                                env: process.env.SECRET_KEY,
-                                movies: moviesMap
-                            });
-                        }
-                    }
-                    else{
-                        return res.json({ success: false, message: 'Could not GET'});
-                    }
-                });
-
-            } else if (req.method == 'POST') { //Create
-
-                // save the movie
-                newMovie.save(function(err) {
-                    if (err) {
-                        return res.json({ success: false, message: 'Could not save movie.'});
-                    }
-
-                    else{
-                        res.status(200).send({
-                            success: true,
-                            message: "Movie Saved",
-                            headers: req.headers,
-                            query: req.query,
-                            env: process.env.SECRET_KEY
-                        });
-                    }
-                });
-
-
-            } else if (req.method == 'DELETE') { //Delete
-
-                Movie.remove({title: newMovie.title}, function(err){
-                    if (err){
-                        res.send({status:false, message:"Unable to delete movie."});
-                    }
-                    else{
-                        res.status(200).send({message:"Movie Deleted", headers: req.headers, query: req.query, env: process.env.SECRET_KEY});
-                    }
-                });
-
-
-
-            } else if (req.method == 'PUT') { //Update
-                newMovie.oldTitle = req.body.oldTitle;//For update, add an oldTitle to the request to find movie to update.
-
-                Movie.findOneAndUpdate({title: newMovie.oldTitle}, {$set:{title: newMovie.title, yearReleased: newMovie.yearReleased, genre: newMovie.genre, actors: newMovie.actors}}, (err,docs) =>{
-
-                    if (err){
-                        res.send({status:false, message:"Could not update movie."});
-                    }
-                    else{
-                        res.status(200).send({ message:"Movie Updated", headers: req.headers, query: req.query, env: process.env.SECRET_KEY});
-                    }
-
+            if (newMovie.actors.length != 3) { //Check actors array size.
+                res.json({
+                    success: false, message: 'Need to pass a two-dimensional array of 3 actors. ' +
+                        'Each element needs an actor name, and a character name.'
                 });
             } else {
-                res.send("HTTP request not supported.");
-                res.end();
+                if (req.method == 'POST') { //Create
+
+                    // save the movie
+                    newMovie.save(function (err) {
+                        if (err) {
+                            return res.json({success: false, message: 'Could not save movie.'});
+                        } else {
+                            res.status(200).send({
+                                success: true,
+                                message: "Movie Saved",
+                                headers: req.headers,
+                                query: req.query,
+                                env: process.env.SECRET_KEY
+                            });
+                        }
+                    });
+
+
+                } else if (req.method == 'DELETE') { //Delete
+
+                    Movie.remove({title: newMovie.title}, function (err) {
+                        if (err) {
+                            res.send({status: false, message: "Unable to delete movie."});
+                        } else {
+                            res.status(200).send({
+                                message: "Movie Deleted",
+                                headers: req.headers,
+                                query: req.query,
+                                env: process.env.SECRET_KEY
+                            });
+                        }
+                    });
+
+
+                } else if (req.method == 'PUT') { //Update
+                    newMovie.oldTitle = req.body.oldTitle;//For update, add an oldTitle to the request to find movie to update.
+
+                    Movie.findOneAndUpdate({title: newMovie.oldTitle}, {
+                        $set: {
+                            title: newMovie.title, yearReleased: newMovie.yearReleased,
+                            genre: newMovie.genre, actors: newMovie.actors, imageUrl: newMovie.imageUrl
+                        }
+                    }, (err, docs) => {
+
+                        if (err) {
+                            res.send({status: false, message: "Could not update movie."});
+                        } else {
+                            res.status(200).send({
+                                message: "Movie Updated",
+                                headers: req.headers,
+                                query: req.query,
+                                env: process.env.SECRET_KEY
+                            });
+                        }
+
+                    });
+                } else {
+                    res.send("HTTP request not supported.");
+                    res.end();
+                }
             }
         }
-
     }
 });
 
